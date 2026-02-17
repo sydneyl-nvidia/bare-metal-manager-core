@@ -23,7 +23,7 @@ use futures_util::FutureExt;
 use tonic::{Request, Response, Status};
 
 use crate::api::Api;
-use crate::{CarbideError, DatabaseError};
+use crate::{CarbideError};
 
 pub async fn get_rack(
     api: &Api,
@@ -67,9 +67,7 @@ pub async fn find_rack_state_histories(
         );
     }
 
-    let mut txn = api.database_connection.begin().await.map_err(|e| {
-        CarbideError::from(DatabaseError::new("begin find_rack_state_histories", e))
-    })?;
+    let mut txn = api.txn_begin().await?;
 
     let results = db::rack_state_history::find_by_rack_ids(&mut txn, &rack_ids)
         .await
@@ -85,9 +83,7 @@ pub async fn find_rack_state_histories(
         );
     }
 
-    txn.commit()
-        .await
-        .map_err(|e| CarbideError::from(DatabaseError::new("end find_rack_state_histories", e)))?;
+    txn.commit().await?;
 
     Ok(tonic::Response::new(response))
 }

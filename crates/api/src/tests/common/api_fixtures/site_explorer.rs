@@ -1518,11 +1518,37 @@ pub async fn new_power_shelf(
     Ok(power_shelf_id)
 }
 
+/*
+Builder for a test rack. For now, we only have tests that use expected
+computer trays, switches, and power shelves for testing rack state
+histories. So that is all that is currently represented here. The intent
+of this builder is to create test racks that may have various combinations
+of expected and discovered resources to allow for testing a simulated rack
+in various states, and abstract the way in which they are configured and
+stored in the database, as the case may be.
+
+The expectation is we will add members to this struct such as:
+
+```
+compute_trays: Vec<MachineId>,
+```
+
+and fns to its impl such as:
+
+```
+pub fn _with_compute_trays(mut self, compute_trays: Vec<MachineId>) -> Self {
+    self.compute_trays = compute_trays;
+    self
+}
+```
+
+In short, what belongs here is anything that might aid a test writer to
+create a rack, represented in the database, representing state of a rack
+for both happy and non-happy path positive and negative testing. And
+do it without regard to the underlying impl and in a way that makes it
+clear looking at the test what the intent of the configuration is.
+*/
 pub struct TestRackDbBuilder {
-    compute_trays: Vec<MachineId>,
-    power_shelves: Vec<PowerShelfId>,
-    // TODO: unhide this when we have machine-a-tron support for switch
-    _switches: Vec<SwitchId>,
     expected_compute_trays: Vec<MacAddress>,
     expected_power_shelves: Vec<MacAddress>,
     expected_switches: Vec<MacAddress>,
@@ -1532,10 +1558,6 @@ pub struct TestRackDbBuilder {
 impl Default for TestRackDbBuilder {
     fn default() -> Self {
         TestRackDbBuilder {
-            compute_trays: vec![],
-            power_shelves: vec![],
-            // TODO: unhide this when we have machine-a-tron support for switch
-            _switches: vec![],
             expected_compute_trays: vec![],
             expected_power_shelves: vec![],
             expected_switches: vec![],
@@ -1556,27 +1578,6 @@ impl TestRackDbBuilder {
         self
     }
 
-    /// TODO: unhide this when we have a test that prefills the discovered
-    /// compute trays  
-    pub fn _with_compute_trays(mut self, compute_trays: Vec<MachineId>) -> Self {
-        self.compute_trays = compute_trays;
-        self
-    }
-
-    /// TODO: unhide this when we have a test that prefills the discovered
-    /// power shelfs
-    pub fn _with_power_shelves(mut self, power_shelves: Vec<PowerShelfId>) -> Self {
-        self.power_shelves = power_shelves;
-        self
-    }
-
-    /// TODO: unhide this when we have a test that prefills the discovered
-    /// switches
-    pub fn _with_switches(mut self, switches: Vec<SwitchId>) -> Self {
-        self._switches = switches;
-        self
-    }
-
     pub fn with_expected_compute_trays(mut self, expected_compute_trays: Vec<[u8; 6]>) -> Self {
         self.expected_compute_trays = expected_compute_trays
             .into_iter()
@@ -1593,13 +1594,6 @@ impl TestRackDbBuilder {
         self
     }
 
-    /// TODO: unhide this when we have a test that sets expected switches (presumably, but
-    /// not necessarily when machine-a-tron supports switches)
-    pub fn _with_expected_switches(mut self, expected_switches: Vec<[u8; 6]>) -> Self {
-        self.expected_switches = expected_switches.into_iter().map(MacAddress::new).collect();
-        self
-    }
-
     pub async fn persist(&self, txn: &mut PgConnection) -> Result<RackId, DatabaseError> {
         db_rack::create(
             txn,
@@ -1610,16 +1604,15 @@ impl TestRackDbBuilder {
         )
         .await?;
 
-        if !self.compute_trays.is_empty() || !self.power_shelves.is_empty() {
-            let cfg = RackConfig {
-                compute_trays: self.compute_trays.clone(),
-                power_shelves: self.power_shelves.clone(),
-                expected_compute_trays: self.expected_compute_trays.clone(),
-                expected_power_shelves: self.expected_power_shelves.clone(),
-            };
+        let cfg = RackConfig {
+            // TODO: represent compute_trays and power_shelves in builder.
+            compute_trays: vec![],
+            power_shelves: vec![],
+            expected_compute_trays: self.expected_compute_trays.clone(),
+            expected_power_shelves: self.expected_power_shelves.clone(),
+        };
 
-            db_rack::update(txn, self.rack_id, &cfg).await?;
-        }
+        db_rack::update(txn, self.rack_id, &cfg).await?;
 
         Ok(self.rack_id)
     }

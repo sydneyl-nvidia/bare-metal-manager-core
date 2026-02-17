@@ -22,8 +22,8 @@ use db::{WithTransaction, rack as db_rack};
 use futures_util::FutureExt;
 use tonic::{Request, Response, Status};
 
+use crate::CarbideError;
 use crate::api::Api;
-use crate::{CarbideError};
 
 pub async fn get_rack(
     api: &Api,

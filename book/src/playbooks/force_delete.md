@@ -1,12 +1,12 @@
-# Force deleting and rebuilding Carbide hosts
+# Force deleting and rebuilding BMM hosts
 
-In various cases it might be necessary to force-delete knowledge about hosts from
-the Carbide database, and to restart the discovery process for those. Examples for
+In various cases, it might be necessary to force-delete knowledge about hosts from
+the database and to restart the discovery process for those hosts. The following are
 use-cases where force-delete can be helpful:
 
-- If a host managed by Carbide has entered an errorenous state from which it can not
-automatically recover
-- If a non backward compatible software update requires the host to go through the discovery phase again
+- If a host managed by NVIDIA Bare Metal Manager (BMM) has entered an erroneous state from which it can not
+automatically recover.
+- If a non backward compatible software update requires the host to go through the discovery phase again.
 
 ## Important note
 
@@ -19,7 +19,7 @@ Site providers would get a safe version of this workflow later on that moves the
 
 ## Force-Deletion Steps
 
-The following steps can be used to force-delete knowledge about a a Carbide host:
+The following steps can be used to force-delete knowledge about a a BMM host:
 
 ### 1. Obtain access to `carbide-admin-cli`
 
@@ -49,17 +49,17 @@ as parameters.
 Force-deleting a machine will not delete its last set of credentials from `vault`. Therefore the site controller can still access those.
 
 Once a reboot is triggered, the DPU of the Machine should boot into the
-Carbide discovery image again. This should initiate DPU discovery. A second
+BMM discovery image again. This should initiate DPU discovery. A second
 reboot is required to initiate host discovery. After those steps, the host
 should be fully rebuilt and available.
 
 ## Reinstall OS Steps
 
-Deleting and recreating a Carbide instance can take upwards of 1.5 hours. However, if you do not need to change the
+Deleting and recreating a BMM instance can take upwards of 1.5 hours. However, if you do not need to change the
 PXE image you can reinstall the OS in place and reuse your allocated system. All the other information about your
 instance will stay the same. *This procedure will delete any data on the host!*
 
-The following steps can be used to reinstall the host OS on a Carbide host:
+The following steps can be used to reinstall the host OS on a BMM host:
 
 ### 1. Obtain access to the `carbide-admin-cli` tool
 

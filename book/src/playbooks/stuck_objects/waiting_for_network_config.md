@@ -15,9 +15,8 @@ This feedback mechanism works in the following fashion:
    configurations back to Carbide using the `RecordDpuNetworkStatus` API.
    This report also includes the DPUs health in the form of a `HealthReport`.
 
-[If the DPU has not recently reported that it is up, healthy and that the latest
-desired configuration is applied](https://gitlab-master.nvidia.com/nvmetal/carbide/-/blob/38849aed602a2ab6e19a5315b342db3d4535b143/api/src/state_controller/machine/handler.rs#L104-114),
-the state will not be advanced.
+If the DPU has not recently reported that it is up, healthy and that the latest
+desired configuration is applied, the state will not be advanced.
 
 If a ManagedHost is stuck due to this check, you can inspect which condition is
 not met by inspecting the last report from the Host and DPUs
@@ -118,7 +117,7 @@ the DPU page in the admin Web UI: [https://api-pdx01.frg.nvidia.com/admin/machin
 The summary for this example is that the Machine is stuck because the DPU
 - is either not healthy at all (e.g. not booted)
 - is not running `forge-dpu-agent`
-- `forge-dpu-agent` is not reporting back to carbide
+- `forge-dpu-agent` is not reporting back to BMM
 
 ## Follow-up investigation steps
 

@@ -1,9 +1,11 @@
 # Architecture
 
-This page discusses the high level architecture of a Carbide managed site.
+This page discusses the high level architecture of a site running NVIDIA Bare Metal Manager (BMM).
 
-Carbide orchestrates the lifecycle of ["Managed Hosts"](#managed-hosts) and other resources via set of cooperating control plane services.
+BMM orchestrates the lifecycle of ["Managed Hosts"](#managed-hosts) and other resources via set of cooperating control plane services.
 These control plane services have to be deployed to a Kubernetes cluster with a size of at least 3 nodes (for high availability).
+
+![BMM Architecture Diagram](/images/bmm_arch_diagram.png)
 
 The Kubernetes cluster needs to have variety of services deployed:
 1. [The Carbide control plane services](#carbide-control-plane-services). These services are specific to Carbide, and must be deployed together in order to allow Carbide to manage the lifecyle of hosts.
@@ -20,6 +22,7 @@ The following chapters look at each of these in more detail.
 A "Managed Host" is a host whose lifecycle is managed by Carbide.
 
 The managed host consists of various internal components that are all part of the same chassis or tray:
+
 - The actual x86 or ARM host, with an arbitrary amount of GPUs
 - One or more DPUs (of type Bluefield 2 or Bluefield 3) plugged into the host
 - The BMC that is used to manage the host

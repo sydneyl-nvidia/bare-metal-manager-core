@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -31,6 +30,7 @@ use super::db;
 use crate::logging::sqlx_query_tracing::{self, SqlxQueryDataAggregation};
 use crate::state_controller::config::IterationConfig;
 use crate::state_controller::controller::ControllerIterationId;
+use crate::state_controller::db_write_batch::DbWriteBatch;
 use crate::state_controller::io::StateControllerIO;
 use crate::state_controller::metrics::{
     IterationMetrics, MetricHolder, ObjectHandlerMetrics, StateProcessorMetricEmitter,
@@ -38,7 +38,7 @@ use crate::state_controller::metrics::{
 use crate::state_controller::state_change_emitter::{StateChangeEmitter, StateChangeEvent};
 use crate::state_controller::state_handler::{
     FromStateHandlerResult, StateHandler, StateHandlerContext, StateHandlerContextObjects,
-    StateHandlerError, StateHandlerOutcome, StateHandlerOutcomeWithTransaction,
+    StateHandlerError, StateHandlerOutcome,
 };
 
 /// The `StateProcessor` is responsible for executing the state handler functions
@@ -670,9 +670,11 @@ async fn process_object<IO: StateControllerIO>(
         let state_sla = IO::state_sla(&controller_state);
         metrics.common.time_in_state_above_sla = state_sla.time_in_state_above_sla;
 
+        let mut pending_db_writes = DbWriteBatch::new();
         let mut ctx = StateHandlerContext {
             services: &mut services,
             metrics: &mut metrics.specific,
+            pending_db_writes: &mut pending_db_writes,
         };
 
         // Commit the transaction now, since we don't want to leave a txn open
@@ -687,14 +689,17 @@ async fn process_object<IO: StateControllerIO>(
         // handler was successful and gave us back a transaction, use that,
         // otherwise make our own.
         let (handler_outcome, mut txn) = match handler_output {
-            Ok(StateHandlerOutcomeWithTransaction {
-                outcome,
-                transaction,
-            }) => {
-                if let Some(txn) = transaction {
-                    (Ok(outcome), txn)
+            Ok(mut outcome) => {
+                let mut txn = if let Some(txn) = outcome.take_transaction() {
+                    txn
                 } else {
-                    (Ok(outcome), pool.begin().await?)
+                    pool.begin().await?
+                };
+                if let Err(e) = pending_db_writes.apply_all(&mut txn).await {
+                    // If there's an error running the writes, count that as the handler outcome
+                    (Err(e), txn)
+                } else {
+                    (Ok(outcome), txn)
                 }
             }
             Err(e) => (Err(e), pool.begin().await?),

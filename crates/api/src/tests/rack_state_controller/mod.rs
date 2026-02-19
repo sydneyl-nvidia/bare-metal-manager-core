@@ -31,7 +31,6 @@ use crate::state_controller::rack::context::RackStateHandlerContextObjects;
 use crate::state_controller::rack::io::RackStateControllerIO;
 use crate::state_controller::state_handler::{
     StateHandler, StateHandlerContext, StateHandlerError, StateHandlerOutcome,
-    StateHandlerOutcomeWithTransaction,
 };
 use crate::tests::common::api_fixtures::create_test_env;
 
@@ -59,7 +58,7 @@ impl StateHandler for TestRackStateHandler {
         state: &mut Rack,
         _controller_state: &Self::ControllerState,
         _ctx: &mut StateHandlerContext<Self::ContextObjects>,
-    ) -> Result<StateHandlerOutcomeWithTransaction<Self::ControllerState>, StateHandlerError> {
+    ) -> Result<StateHandlerOutcome<Self::ControllerState>, StateHandlerError> {
         assert_eq!(state.id, *rack_id);
         self.count.fetch_add(1, Ordering::SeqCst);
         {
@@ -67,7 +66,7 @@ impl StateHandler for TestRackStateHandler {
             *guard.entry(rack_id.to_string()).or_default() += 1;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
-        Ok(StateHandlerOutcome::do_nothing().with_txn(None))
+        Ok(StateHandlerOutcome::do_nothing())
     }
 }
 

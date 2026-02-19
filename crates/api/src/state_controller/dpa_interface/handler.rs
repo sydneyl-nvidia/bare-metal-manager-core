@@ -34,7 +34,6 @@ use crate::state_controller::common_services::CommonStateHandlerServices;
 use crate::state_controller::dpa_interface::context::DpaInterfaceStateHandlerContextObjects;
 use crate::state_controller::state_handler::{
     StateHandler, StateHandlerContext, StateHandlerError, StateHandlerOutcome,
-    StateHandlerOutcomeWithTransaction,
 };
 
 /// The actual Dpa Interface State handler
@@ -71,8 +70,7 @@ impl StateHandler for DpaInterfaceStateHandler {
         state: &mut DpaInterface,
         controller_state: &Self::ControllerState,
         ctx: &mut StateHandlerContext<Self::ContextObjects>,
-    ) -> Result<StateHandlerOutcomeWithTransaction<DpaInterfaceControllerState>, StateHandlerError>
-    {
+    ) -> Result<StateHandlerOutcome<DpaInterfaceControllerState>, StateHandlerError> {
         // record metrics irrespective of the state of the dpa interface
         self.record_metrics(state, ctx);
 
@@ -90,12 +88,12 @@ impl StateHandler for DpaInterfaceStateHandler {
                 // They stay in that state until the first time the machine
                 // starts a transition from Ready to Assigned state.
                 if state.use_admin_network() {
-                    return Ok(StateHandlerOutcome::do_nothing().with_txn(None));
+                    return Ok(StateHandlerOutcome::do_nothing());
                 }
 
                 let new_state = DpaInterfaceControllerState::Ready;
                 tracing::info!(state = ?new_state, "Dpa Interface state transition");
-                return Ok(StateHandlerOutcome::transition(new_state).with_txn(None));
+                return Ok(StateHandlerOutcome::transition(new_state));
             }
 
             DpaInterfaceControllerState::Ready => {
@@ -113,13 +111,13 @@ impl StateHandler for DpaInterfaceStateHandler {
                     let new_state = DpaInterfaceControllerState::Unlocking;
                     tracing::info!(state = ?new_state, "Dpa Interface state transition");
 
-                    Ok(StateHandlerOutcome::transition(new_state).with_txn(None))
+                    Ok(StateHandlerOutcome::transition(new_state))
                 } else {
                     let txn =
                         do_heartbeat(state, ctx.services, client, &dpa_info, hb_interval, false)
                             .await?;
 
-                    Ok(StateHandlerOutcome::do_nothing().with_txn(txn))
+                    Ok(StateHandlerOutcome::do_nothing().with_txn_opt(txn))
                 }
             }
 
@@ -134,8 +132,7 @@ impl StateHandler for DpaInterfaceStateHandler {
                     tracing::info!("card_state none for dpa: {:#?}", state.id);
                     return Ok(StateHandlerOutcome::wait(
                         "Waiting for card to get unlocked".to_string(),
-                    )
-                    .with_txn(None));
+                    ));
                 }
                 let cs = state.card_state.clone().unwrap();
                 if cs.lockmode.is_some() {
@@ -143,13 +140,12 @@ impl StateHandler for DpaInterfaceStateHandler {
                     if lm == Unlocked {
                         let new_state = DpaInterfaceControllerState::ApplyProfile;
                         tracing::info!(state = ?new_state, "Dpa Interface state transition");
-                        return Ok(StateHandlerOutcome::transition(new_state).with_txn(None));
+                        return Ok(StateHandlerOutcome::transition(new_state));
                     }
                 }
-                Ok(
-                    StateHandlerOutcome::wait("Waiting for card to get unlocked".to_string())
-                        .with_txn(None),
-                )
+                Ok(StateHandlerOutcome::wait(
+                    "Waiting for card to get unlocked".to_string(),
+                ))
             }
 
             DpaInterfaceControllerState::ApplyProfile => {
@@ -157,7 +153,7 @@ impl StateHandler for DpaInterfaceStateHandler {
                     // Card should be in unlocked state when we come here. So we do
                     // expect card_state to be not NONE.
                     tracing::error!("Unexpected - card_state none for dpa: {:#?}", state.id);
-                    return Ok(StateHandlerOutcome::do_nothing().with_txn(None));
+                    return Ok(StateHandlerOutcome::do_nothing());
                 }
                 let cs = state.card_state.clone().unwrap();
                 if cs.profile.is_some() && cs.profile_synced.is_some() {
@@ -165,18 +161,17 @@ impl StateHandler for DpaInterfaceStateHandler {
                     if psynced {
                         let new_state = DpaInterfaceControllerState::Locking;
                         tracing::info!(state = ?new_state, "Dpa Interface state transition");
-                        return Ok(StateHandlerOutcome::transition(new_state).with_txn(None));
+                        return Ok(StateHandlerOutcome::transition(new_state));
                     }
                 }
                 Ok(StateHandlerOutcome::wait(
                     "Waiting for profile to be applied on card".to_string(),
-                )
-                .with_txn(None))
+                ))
             }
             DpaInterfaceControllerState::Locking => {
                 if state.card_state.is_none() {
                     tracing::error!("Unexpected - card_state none for dpa: {:#?}", state.id);
-                    return Ok(StateHandlerOutcome::do_nothing().with_txn(None));
+                    return Ok(StateHandlerOutcome::do_nothing());
                 }
                 let cs = state.card_state.clone().unwrap();
                 if cs.lockmode.is_some() {
@@ -184,13 +179,12 @@ impl StateHandler for DpaInterfaceStateHandler {
                     if lm == Locked {
                         let new_state = DpaInterfaceControllerState::WaitingForSetVNI;
                         tracing::info!(state = ?new_state, "Dpa Interface state transition");
-                        return Ok(StateHandlerOutcome::transition(new_state).with_txn(None));
+                        return Ok(StateHandlerOutcome::transition(new_state));
                     }
                 }
-                Ok(
-                    StateHandlerOutcome::wait("Waiting for card to get locked".to_string())
-                        .with_txn(None),
-                )
+                Ok(StateHandlerOutcome::wait(
+                    "Waiting for card to get locked".to_string(),
+                ))
             }
 
             DpaInterfaceControllerState::WaitingForSetVNI => {
@@ -216,11 +210,11 @@ impl StateHandler for DpaInterfaceStateHandler {
                         true,  /* send revision */
                     )
                     .await?;
-                    Ok(StateHandlerOutcome::do_nothing().with_txn(txn))
+                    Ok(StateHandlerOutcome::do_nothing().with_txn_opt(txn))
                 } else {
                     let new_state = DpaInterfaceControllerState::Assigned;
                     tracing::info!(state = ?new_state, "Dpa Interface state transition");
-                    Ok(StateHandlerOutcome::transition(new_state).with_txn(None))
+                    Ok(StateHandlerOutcome::transition(new_state))
                 }
             }
             DpaInterfaceControllerState::Assigned => {
@@ -248,14 +242,14 @@ impl StateHandler for DpaInterfaceStateHandler {
                     )
                     .await?;
 
-                    Ok(StateHandlerOutcome::transition(new_state).with_txn(txn))
+                    Ok(StateHandlerOutcome::transition(new_state).with_txn_opt(txn))
                 } else {
                     let txn =
                         do_heartbeat(state, ctx.services, client, &dpa_info, hb_interval, true)
                             .await?;
 
                     // Send a heartbeat command, indicated by the revision string being "NIL".
-                    Ok(StateHandlerOutcome::do_nothing().with_txn(txn))
+                    Ok(StateHandlerOutcome::do_nothing().with_txn_opt(txn))
                 }
             }
             DpaInterfaceControllerState::WaitingForResetVNI => {
@@ -280,11 +274,11 @@ impl StateHandler for DpaInterfaceStateHandler {
                         true,
                     )
                     .await?;
-                    Ok(StateHandlerOutcome::do_nothing().with_txn(txn))
+                    Ok(StateHandlerOutcome::do_nothing().with_txn_opt(txn))
                 } else {
                     let new_state = DpaInterfaceControllerState::Ready;
                     tracing::info!(state = ?new_state, "Dpa Interface state transition");
-                    Ok(StateHandlerOutcome::transition(new_state).with_txn(None))
+                    Ok(StateHandlerOutcome::transition(new_state))
                 }
             }
         }

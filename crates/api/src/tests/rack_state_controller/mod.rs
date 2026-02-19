@@ -88,10 +88,10 @@ impl StateHandler for TestRackStateHandler {
                 },
             },
 
-            _ => return Ok(StateHandlerOutcome::do_nothing().with_txn(None)),
+            _ => return Ok(StateHandlerOutcome::do_nothing()),
         };
 
-        Ok(StateHandlerOutcome::transition(state).with_txn(None))
+        Ok(StateHandlerOutcome::transition(state))
     }
 }
 
